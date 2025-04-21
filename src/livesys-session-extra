@@ -7,6 +7,94 @@ hostnamectl hostname "$ID"
 
 timedatectl set-timezone UTC
 
+# Create directory for distribution-specific theme customizations
+mkdir -p /var/lib/livesys/theme-customizations
+
+# Setup distribution-specific theme customizations based on ID
+case "$ID" in
+  bluefin)
+    # Bluefin - Slate buttons
+    cat > /var/lib/livesys/theme-customizations/button-colors.css << EOF
+button {
+  background-color: #64748b; /* slate color */
+  color: white;
+}
+button:hover {
+  background-color: #475569;
+}
+EOF
+    ;;
+  bazzite)
+    # Bazzite - Purple buttons
+    cat > /var/lib/livesys/theme-customizations/button-colors.css << EOF
+button {
+  background-color: #9333ea; /* purple color */
+  color: white;
+}
+button:hover {
+  background-color: #7e22ce;
+}
+EOF
+    ;;
+  *)
+    # Default theme (no customization)
+    ;;
+esac
+
+# Apply theme customizations if they exist
+if [ -f /var/lib/livesys/theme-customizations/button-colors.css ]; then
+  # For GTK3
+  mkdir -p /etc/skel/.config/gtk-3.0
+  if [ -f /etc/skel/.config/gtk-3.0/gtk.css ]; then
+    cat /var/lib/livesys/theme-customizations/button-colors.css >> /etc/skel/.config/gtk-3.0/gtk.css
+  else
+    cp /var/lib/livesys/theme-customizations/button-colors.css /etc/skel/.config/gtk-3.0/gtk.css
+  fi
+  
+  # For GTK4
+  mkdir -p /etc/skel/.config/gtk-4.0
+  if [ -f /etc/skel/.config/gtk-4.0/gtk.css ]; then
+    cat /var/lib/livesys/theme-customizations/button-colors.css >> /etc/skel/.config/gtk-4.0/gtk.css
+  else
+    cp /var/lib/livesys/theme-customizations/button-colors.css /etc/skel/.config/gtk-4.0/gtk.css
+  fi
+  
+  # Also apply for root user
+  if [ -d /root ]; then
+    mkdir -p /root/.config/gtk-3.0
+    mkdir -p /root/.config/gtk-4.0
+    cp /etc/skel/.config/gtk-3.0/gtk.css /root/.config/gtk-3.0/gtk.css 2>/dev/null || true
+    cp /etc/skel/.config/gtk-4.0/gtk.css /root/.config/gtk-4.0/gtk.css 2>/dev/null || true
+  fi
+  
+  # For currently logged-in user (liveuser)
+  if id "liveuser" >/dev/null 2>&1; then
+    for homedir in /home/*; do
+      if [ -d "$homedir" ]; then
+        username=$(basename "$homedir")
+        user_gtk3_dir="$homedir/.config/gtk-3.0"
+        user_gtk4_dir="$homedir/.config/gtk-4.0"
+        
+        mkdir -p "$user_gtk3_dir" "$user_gtk4_dir"
+        if [ -f "$user_gtk3_dir/gtk.css" ]; then
+          cat /var/lib/livesys/theme-customizations/button-colors.css >> "$user_gtk3_dir/gtk.css"
+        else
+          cp /var/lib/livesys/theme-customizations/button-colors.css "$user_gtk3_dir/gtk.css"
+        fi
+        
+        if [ -f "$user_gtk4_dir/gtk.css" ]; then
+          cat /var/lib/livesys/theme-customizations/button-colors.css >> "$user_gtk4_dir/gtk.css"
+        else
+          cp /var/lib/livesys/theme-customizations/button-colors.css "$user_gtk4_dir/gtk.css"
+        fi
+        
+        # Fix permissions
+        chown -R "$username:$username" "$user_gtk3_dir" "$user_gtk4_dir"
+      fi
+    done
+  fi
+fi
+
 if [ -d /var/lib/livesys/livesys-session-extra.d ]; then
   find /var/lib/livesys/livesys-session-extra.d -type f -exec /bin/bash {} \;
 fi
